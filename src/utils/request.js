@@ -4,7 +4,7 @@ import { Message } from 'element-ui';
 const BASEURL =  process.env.NODE_ENV === 'production' ? '' : '/devApi';
 const service = axios.create({
     baseURL:BASEURL, //http://localhost:8080/api/ == http://www.web-jshtml.cn/productApi
-    timeout: 1000,
+    timeout: 5000,
 });
 
 // 添加请求拦截器
@@ -24,6 +24,7 @@ service.interceptors.response.use(function (response) {
         Message.error(data.message)
         return Promise.reject(data)
     }else{
+
         return response;
     }
    

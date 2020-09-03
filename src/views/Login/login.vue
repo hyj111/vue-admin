@@ -5,11 +5,10 @@
         v-for="(item,index) in menuTab"
         :key="item"
         @click="check(index)"
-        :class="{current:currentIndex==index}"
-        
+        :class="{current:currentIndex==index}"    
       >{{item}}</li>  
     </ul>
-     <sign :currentIndex="currentIndex"/>
+     <sign :currentIndex="currentIndex" ref="newForm" @changeLogin="changeLogin"/>
   </div>
 </template>
 
@@ -25,19 +24,29 @@ export default {
   components :{
       sign
   },
+ 
   methods: {
     check(index) {
-      this.currentIndex = index;
-    },     
+      // console.log(formName);
+      //  this.$refs[formName].resetFields();
+      if(index!=this.currentIndex) {
+         this.$refs.newForm.$refs['ruleForm'].resetFields() 
+      } 
+     this.currentIndex = index;
+    },  
+    changeLogin() {
+      this.currentIndex=0
+      this.$refs.newForm.$refs['ruleForm'].resetFields() 
+    }
+     
   }
 };
 </script>
 <style lang="scss" scoped>
 .login {
-box-sizing: border-box;
-  height: 100vh;
-  
-  padding: 15vw 40vw 0 40vw;
+ box-sizing: border-box; 
+  height: 100vh;  
+  padding: 15vw 39vw 0 39vw;
   background-color: #344a5f;
   .menu-tab {
     // width: 330px;

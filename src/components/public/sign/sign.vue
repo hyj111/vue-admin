@@ -7,7 +7,7 @@
       ref="ruleForm"
       label-width="100px"
       class="demo-ruleForm login-form"
-      size="medium"
+      size="midele"
     >
       <el-form-item label="邮箱" prop="username">
         <el-input type="text" v-model="ruleForm.username" autocomplete="off"></el-input>
@@ -30,16 +30,15 @@
       <el-form-item label="验证码" prop="code">
         <el-row :gutter="0">
           <el-col :span="14">
-            <el-input v-model.number="ruleForm.code"></el-input>
+            <el-input v-model="ruleForm.code"></el-input>
           </el-col>
           <el-col :span="12">
             <el-button
               type="success"
               class="verification"
-              minlength="6"
-              maxlength="6"
+              :disabled="codeButtonStatus"
               @click="getSms"
-            >验证码</el-button>
+            >{{codeButtonText}}</el-button>
           </el-col>
         </el-row>
       </el-form-item>
@@ -48,7 +47,7 @@
           type="danger"
           @click="submitForm('ruleForm')"
           class="block"
-          :disabled="true"
+          :disabled="loginButton"
         >{{currentIndex==0?'登录':'注册'}}</el-button>
       </el-form-item>
     </el-form>
@@ -56,7 +55,9 @@
 </template>
 
 <script>
-import { GetSms } from "@/api/login.js";
+// 引入加密方式
+import sha1 from "js-sha1";
+import { GetSms, Register, Login } from "@/api/login.js";
 import { stripscript } from "@/utils/validate";
 export default {
   name: "Sign",
@@ -66,6 +67,7 @@ export default {
       default: 0
     }
   },
+
   data() {
     //验证码规则
     var alidateCode = (rule, value, callback) => {
@@ -127,39 +129,136 @@ export default {
         password: [{ validator: validatePassword, trigger: "blur" }],
         code: [{ validator: alidateCode, trigger: "blur" }],
         checkPass: [{ validator: validatePass2, trigger: "blur" }]
-      }
+      },
+      // 验证码按钮状态
+      codeButtonStatus: false,
+      codeButtonText: "获取验证码",
+
+      //登录注册按钮状态
+      loginButton: true,
+
+      // 定时器
+      timer: null
     };
   },
-  computed: {
-    
+  watch: {
+    currentIndex() {
+      clearInterval(this.timer);
+      this.codeButtonStatus = false;
+      this.codeButtonText = "获取验证码";
+    }
   },
   methods: {
+    // 登录注册按钮
     submitForm(formName) {
       this.$refs[formName].validate(valid => {
         if (valid) {
-          alert("submit!");
+          this.currentIndex == 0 ? this.login() : this.register();
         } else {
           console.log("error submit!!");
           return false;
         }
       });
     },
+    // 登录
+    login() {     
+      let requestData = {
+        username: this.ruleForm.username,
+        password: sha1(this.ruleForm.password),
+        code: this.ruleForm.code,
+      };
+      Login(requestData)
+        .then(res => {
+          //登录成功之后
+          console.log(res);
+          this.$message({
+            message: res.data.message,
+            type: "success"
+          });
+          this.$store.commit('setUsername',res.data.data.username)
+          this.$store.commit('setToken',res.data.data.token)
+          this.$router.push('/console')
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    },
+
+    // 注册
+    register() {
+      let requestData = {
+        username: this.ruleForm.username,
+        password: sha1(this.ruleForm.password),
+        code: this.ruleForm.code,
+      };
+      Register(requestData)
+        .then(res => {
+          //注册成功之后
+          this.$emit('changeLogin')
+          this.$message({
+            message: res.data.message,
+            type: "success"
+          });
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    },
+
     // 获取验证码
     getSms() {
       let reg = /^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
-      if(this.ruleForm.username == ''){
-        this.$message.error('邮箱不能为空')
-        return false
-      }else if(reg.test(this.ruleForm.username)==false){
-        this.$message.error('邮箱格式错误')
-         return false
+      if (this.ruleForm.username == "") {
+        this.$message.error("邮箱不能为空");
+        return false;
+      } else if (reg.test(this.ruleForm.username) == false) {
+        this.$message.error("邮箱格式错误");
+        return false;
       }
-      let requestData = { username: this.ruleForm.username,module:'login'}
-      GetSms(requestData).then(res=>{
-        console.log(res);
-      }).catch(err=>{
-        console.log(err);
-      })
+      let requestData = { username: this.ruleForm.username, module: "login" };
+      // 改变请求验证码的模式分为注册和登录
+      if (this.currentIndex != 0) {
+        requestData.module = "register";
+      } else {
+        requestData.module = "login";
+      }
+
+      this.codeButtonStatus = true;
+      this.codeButtonText = "发送中";
+      setTimeout(() => {
+        GetSms(requestData)
+          .then(res => {
+            this.loginButton = false;
+            this.$message({
+              message: res.data.message,
+              type: "success"
+            });
+            // 调定时器，倒计时60s
+            this.countDown(60);
+          })
+          .catch(err => {
+            console.log(err);
+          });
+      }, 1000);
+    },
+
+    // 倒计时方法
+    countDown(number) {
+      let time = number;
+      // 判断定时器是否存在，存在的话清除
+      if (this.timer) {
+        clearInterval(this.timer);
+      }
+      this.timer = setInterval(() => {
+        time--;
+        if (time == 0) {
+          clearInterval(this.timer);
+          this.codeButtonStatus = false;
+          this.codeButtonText = "再次获取";
+        } else {
+          this.codeButtonText = `倒计时${time}秒`;
+        }
+      }, 1000);
     }
   }
 };
@@ -167,7 +266,7 @@ export default {
 
 <style lang="scss" scoped>
 .login-form {
-  margin: 30px auto;
+  margin: 15px auto;
 }
 .verification {
   position: absolute;
